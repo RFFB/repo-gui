@@ -1,0 +1,220 @@
+DROP DATABASE IF EXISTS vk_modul_4;
+CREATE DATABASE vk_modul_4;
+USE vk_modul_4;
+
+DROP TABLE IF EXISTS users;
+CREATE TABLE users (
+	id SERIAL primary key ,  # BIGINT unsigned not null auto_increment, unique
+    firstname VARCHAR(50),
+    lastname VARCHAR(50),
+    email VARCHAR(100) UNIQUE,
+    phone BIGINT,
+    INDEX users_phone_idx(phone),
+    INDEX users_names_idx(firstname, lastname)
+);
+
+DROP TABLE IF EXISTS profiles;
+CREATE TABLE profiles (
+	id SERIAL primary key,
+    user_id BIGINT unsigned not null,
+    gender CHAR(1),
+    birthday DATETIME,
+    photo_id BIGINT unsigned null,
+    created_at DATETIME DEFAULT NOW(),
+    hometown VARCHAR(100),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+DROP TABLE IF EXISTS message;
+CREATE TABLE message (
+	id SERIAL primary key,
+    from_user_id BIGINT unsigned not null,
+    to_user_id BIGINT unsigned not null,
+    body TEXT,
+    created_at DATETIME default NOW(),
+    index(from_user_id),
+    index(to_user_id),
+    FOREIGN KEY (from_user_id) references users(id),
+    FOREIGN KEY (to_user_id) references users(id)
+);
+
+DROP TABLE IF EXISTS friends_requests;
+CREATE TABLE friends_requests (
+initiator_user_id BIGINT unsigned not null,
+target_user_id BIGINT unsigned not null,
+status ENUM('requested', 'approved', 'decline', 'unfriended'),
+requested_at DATETIME default NOW(),
+confirmed_at DATETIME,
+PRIMARY KEY (initiator_user_id, target_user_id),
+INDEX(initiator_user_id),
+INDEX(target_user_id),
+FOREIGN KEY (initiator_user_id) REFERENCES users(id),
+FOREIGN KEY (target_user_id) REFERENCES users(id)
+);
+
+DROP TABLE IF EXISTS communities;
+CREATE TABLE communities(
+	id SERIAL PRIMARY KEY,
+	name VARCHAR(150),
+	INDEX communities_name_idx(name)
+);
+
+DROP TABLE IF EXISTS users_communities;
+CREATE TABLE users_communities(
+	user_id BIGINT UNSIGNED NOT NULL,
+	community_id BIGINT UNSIGNED NOT NULL,
+  
+	PRIMARY KEY (user_id, community_id), -- чтобы не было 2 записей о пользователе и сообществе
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (community_id) REFERENCES communities(id)
+);
+
+DROP TABLE IF EXISTS media_types;
+CREATE TABLE media_types(
+	id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    created_at DATETIME DEFAULT NOW(),
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+
+    -- записей мало, поэтому индекс будет лишним (замедлит работу)!
+);
+
+DROP TABLE IF EXISTS media;
+CREATE TABLE media(
+	id SERIAL PRIMARY KEY,
+    media_type_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+  	body text,
+    filename VARCHAR(255),
+    size INT,
+	metadata JSON,
+    created_at DATETIME DEFAULT NOW(),
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (media_type_id) REFERENCES media_types(id)
+);
+
+DROP TABLE IF EXISTS likes;
+CREATE TABLE likes(
+	id SERIAL PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    media_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME DEFAULT NOW(),
+
+    -- PRIMARY KEY (user_id, media_id) – можно было и так вместо id в качестве PK
+  	-- слишком увлекаться индексами тоже опасно, рациональнее их добавлять по мере необходимости (напр., провисают по времени какие-то запросы)  
+
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (media_id) REFERENCES media(id)
+);
+
+DROP TABLE IF EXISTS `photo_albums`;
+CREATE TABLE `photo_albums` (
+	`id` SERIAL,
+	`name` varchar(255) DEFAULT NULL,
+    `user_id` BIGINT UNSIGNED DEFAULT NULL,
+    `body` TEXT,
+
+    FOREIGN KEY (user_id) REFERENCES users(id),
+  	PRIMARY KEY (`id`)
+);
+
+DROP TABLE IF EXISTS `photos`;
+CREATE TABLE `photos` (
+	id SERIAL PRIMARY KEY,
+	`album_id` BIGINT unsigned NOT NULL,
+	`media_id` BIGINT unsigned NOT NULL,
+
+	FOREIGN KEY (album_id) REFERENCES photo_albums(id),
+    FOREIGN KEY (media_id) REFERENCES media(id)
+);
+
+DROP TABLE IF EXISTS `video_albums`;
+CREATE TABLE `video_albums` (
+	`id` SERIAL,
+	`name` varchar(255) DEFAULT NULL,
+    `user_id` BIGINT UNSIGNED DEFAULT NULL,
+    `body` TEXT,
+
+    FOREIGN KEY (user_id) REFERENCES users(id),
+  	PRIMARY KEY (`id`)
+);
+
+DROP TABLE IF EXISTS `videos`;
+CREATE TABLE `videos` (
+	`id` SERIAL PRIMARY KEY,
+	`album_id` BIGINT unsigned NOT NULL,
+	`media_id` BIGINT unsigned NOT NULL,
+
+	FOREIGN KEY (album_id) REFERENCES video_albums(id),
+    FOREIGN KEY (media_id) REFERENCES media(id)
+);
+
+DROP TABLE IF EXISTS `posts`;
+CREATE TABLE `posts` (
+	id SERIAL PRIMARY KEY,
+	`media_id` BIGINT unsigned NOT NULL,
+
+    FOREIGN KEY (media_id) REFERENCES media(id)
+);
+
+DROP TABLE IF EXISTS `likes_photos`;
+CREATE TABLE `likes_photos` (
+	id SERIAL,
+    likes_id BIGINT UNSIGNED NOT NULL,
+	user_id BIGINT UNSIGNED NOT NULL,
+	photos_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME DEFAULT NOW(),
+
+    PRIMARY KEY (user_id, photos_id),
+  	
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (photos_id) REFERENCES photos(id)
+);
+
+DROP TABLE IF EXISTS `likes_videos`;
+CREATE TABLE `likes_videos` (
+	id SERIAL,
+    likes_id BIGINT UNSIGNED NOT NULL,
+	user_id BIGINT UNSIGNED NOT NULL,
+	videos_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME DEFAULT NOW(),
+
+    PRIMARY KEY (user_id, videos_id),
+  	
+    FOREIGN KEY (likes_id) REFERENCES likes(id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (videos_id) REFERENCES videos(id)
+);
+
+DROP TABLE IF EXISTS `likes_posts`;
+CREATE TABLE `likes_posts` (
+	id SERIAL,
+    likes_id BIGINT UNSIGNED NOT NULL,
+	user_id BIGINT UNSIGNED NOT NULL,
+	posts_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME DEFAULT NOW(),
+
+    PRIMARY KEY (user_id, posts_id),
+  	
+    FOREIGN KEY (likes_id) REFERENCES likes(id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (posts_id) REFERENCES posts(id)
+);
+
+DROP TABLE IF EXISTS `likes_users`;
+CREATE TABLE `likes_users` (
+	id SERIAL,
+    likes_id BIGINT UNSIGNED NOT NULL,
+	from_user_id BIGINT unsigned not null,
+    to_user_id BIGINT unsigned not null,
+    created_at DATETIME DEFAULT NOW(),
+
+    PRIMARY KEY (from_user_id, to_user_id),
+  	
+    FOREIGN KEY (likes_id) REFERENCES likes(id),
+    FOREIGN KEY (from_user_id) references users(id),
+    FOREIGN KEY (to_user_id) references users(id)
+);
